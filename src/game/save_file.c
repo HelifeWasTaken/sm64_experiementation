@@ -163,7 +163,7 @@ static void restore_main_menu_data(s32 srcSlot) {
 static void save_main_menu_data(void) {
     if (gMainMenuDataModified) {
         // Compute checksum
-        add_save_block_signature(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]), MENU_DATA_MAGIC);
+        //add_save_block_signature(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]), MENU_DATA_MAGIC);
 
         // Back up data
         bcopy(&gSaveBuffer.menuData[0], &gSaveBuffer.menuData[1], sizeof(gSaveBuffer.menuData[1]));
@@ -252,12 +252,12 @@ static void restore_save_file_data(s32 fileIndex, s32 srcSlot) {
 void save_file_do_save(s32 fileIndex) {
     if (gSaveFileModified) {
         // Compute checksum
-        add_save_block_signature(&gSaveBuffer.files[fileIndex][0],
-                                 sizeof(gSaveBuffer.files[fileIndex][0]), SAVE_FILE_MAGIC);
+        //add_save_block_signature(&gSaveBuffer.files[fileIndex][0],
+        //                         sizeof(gSaveBuffer.files[fileIndex][0]), SAVE_FILE_MAGIC);
 
         // Copy to backup slot
-        bcopy(&gSaveBuffer.files[fileIndex][0], &gSaveBuffer.files[fileIndex][1],
-              sizeof(gSaveBuffer.files[fileIndex][1]));
+        //bcopy(&gSaveBuffer.files[fileIndex][0], &gSaveBuffer.files[fileIndex][1],
+        //      sizeof(gSaveBuffer.files[fileIndex][1]));
 
         // Write to EEPROM
         write_eeprom_data(gSaveBuffer.files[fileIndex], sizeof(gSaveBuffer.files[fileIndex]));
@@ -268,10 +268,35 @@ void save_file_do_save(s32 fileIndex) {
     save_main_menu_data();
 }
 
-void save_file_erase(s32 fileIndex) {
-    touch_high_score_ages(fileIndex);
-    bzero(&gSaveBuffer.files[fileIndex][0], sizeof(gSaveBuffer.files[fileIndex][0]));
+typedef uintptr_t usize_t;
 
+void *HelSm64memcpy(void *d, const void *s, usize_t n)
+{
+    char *dptr = (char *)d;
+    char const *sptr = (char const *)s;
+
+    while (n--)
+        *dptr++ = *sptr++;
+    return (d);
+}
+
+void save_file_erase(s32 fileIndex)
+{
+    u8 i = 0;
+
+    touch_high_score_ages(fileIndex);
+    bzero(&gSaveBuffer.files[0][0], sizeof(gSaveBuffer.files[fileIndex][0]));
+    gSaveBuffer.files[0][0].flags |= 0xFFFFFF;
+    gSaveBuffer.files[0][1].flags |= 0xFFFFFF;
+    for (i = 0; i < COURSE_COUNT; i++) {
+        gSaveBuffer.files[0][0].courseStars[0] |= 0x3;
+    }
+    for (i = 1; i < NUM_SAVE_FILES; i++) {
+        HelSm64memcpy(&gSaveBuffer.files[i][0],
+            &gSaveBuffer.files[fileIndex][0], sizeof(struct SaveFile));
+        HelSm64memcpy(&gSaveBuffer.files[i][1],
+            &gSaveBuffer.files[fileIndex][1], sizeof(struct SaveFile));
+    }
     gSaveFileModified = TRUE;
     save_file_do_save(fileIndex);
 }
@@ -287,7 +312,6 @@ BAD_RETURN(s32) save_file_copy(s32 srcFileIndex, s32 destFileIndex) {
     gSaveFileModified = TRUE;
     save_file_do_save(destFileIndex);
 }
-
 void save_file_load_all(void) {
     s32 file;
     s32 validSlots;
@@ -296,6 +320,7 @@ void save_file_load_all(void) {
     gSaveFileModified = FALSE;
 
     bzero(&gSaveBuffer, sizeof(gSaveBuffer));
+
     read_eeprom_data(&gSaveBuffer, sizeof(gSaveBuffer));
 
     // Verify the main menu data and create a backup copy if only one of the slots is valid.
@@ -315,8 +340,8 @@ void save_file_load_all(void) {
 
     for (file = 0; file < NUM_SAVE_FILES; file++) {
         // Verify the save file and create a backup copy if only one of the slots is valid.
-        validSlots = verify_save_block_signature(&gSaveBuffer.files[file][0], sizeof(gSaveBuffer.files[file][0]), SAVE_FILE_MAGIC);
-        validSlots |= verify_save_block_signature(&gSaveBuffer.files[file][1], sizeof(gSaveBuffer.files[file][1]), SAVE_FILE_MAGIC) << 1;
+        //validSlots = verify_save_block_signature(&gSaveBuffer.files[file][0], sizeof(gSaveBuffer.files[file][0]), SAVE_FILE_MAGIC);
+        //validSlots |= verify_save_block_signature(&gSaveBuffer.files[file][1], sizeof(gSaveBuffer.files[file][1]), SAVE_FILE_MAGIC) << 1;
         switch (validSlots) {
             case 0: // Neither copy is correct
                 save_file_erase(file);
@@ -329,7 +354,6 @@ void save_file_load_all(void) {
                 break;
         }
     }
-
     stub_save_file_1();
 }
 
